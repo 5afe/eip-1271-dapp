@@ -1,87 +1,30 @@
-import { hashMessage, hexlify, Interface, toUtf8Bytes } from 'ethers/lib/utils'
-import { useState } from 'react'
+import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import useWalletConnect from '@/hooks/useWalletConnect'
-import { generateSafeMessageTypedData, hashTypedData } from '@/utils/safe-messages'
-import { GOERLI_TX_SERVICE_STAGING_URL } from '@/config/constants'
-import { flushSync } from 'react-dom'
-import { BigNumber } from 'ethers'
-
-type MessageResponse = {
-  created: string
-  modified: string
-  messageHash: string
-  message: string | unknown // TODO:
-  proposedBy: string
-  safeAppId: number | null
-  confirmations: unknown[] // TODO:
-  preparedSignature: string
-}
-
-const getExampleTypedData = (chainId: number, verifyingContract: string, contents: string) => {
-  return {
-    types: {
-      EIP712Domain: [
-        { name: 'name', type: 'string' },
-        { name: 'version', type: 'string' },
-        { name: 'chainId', type: 'uint256' },
-        { name: 'verifyingContract', type: 'address' },
-      ],
-      Person: [
-        { name: 'name', type: 'string' },
-        { name: 'account', type: 'address' },
-      ],
-      Mail: [
-        { name: 'from', type: 'Person' },
-        { name: 'to', type: 'Person' },
-        { name: 'contents', type: 'string' },
-      ],
-    },
-    primaryType: 'Mail',
-    domain: {
-      name: 'EIP-1271 Example DApp',
-      version: '1.0',
-      chainId,
-      verifyingContract,
-    },
-    message: {
-      from: {
-        name: 'Alice',
-        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      to: {
-        name: 'Bob',
-        account: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      },
-      contents,
-    },
-  }
-}
-
-const SAFE_ABI = [
-  'function isValidSignature(bytes calldata _data, bytes calldata _signature) public view returns (bytes4)',
-  'function getMessageHashForSafe(address safe, bytes memory message) public view returns (bytes32)',
-  'function getThreshold() public view returns (uint256)',
-]
-const safeSignerInterface = new Interface(SAFE_ABI)
+import { fetchSafeMessage, generateSafeMessage } from '@/utils/safe-messages'
+import { getMessageHashForSafe, getThreshold, isValidSignature } from '@/utils/safe-interface'
+import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 
 const App = (): ReactElement => {
   const connector = useWalletConnect()
+  const [isSigningOffChain, setIsSigningOffChain] = useState(false)
 
-  const [safeAddress, setSafeAddress] = useState(connector.accounts[0] || '')
-  const [threshold, setThreshold] = useState<number | undefined>()
+  const [safeAddress, setSafeAddress] = useState<string>(connector.accounts[0])
 
-  const [isOffChain, setIsOffChain] = useState(false)
   const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
-  const [verificationResult, setVerificationResult] = useState<string>('')
 
-  const safeMessage = generateSafeMessageTypedData(connector.chainId, safeAddress, message)
-
-  const safeMessageHash = hashTypedData(safeMessage)
+  const safeMessage = useMemo(() => {
+    return generateSafeMessage(connector.chainId, safeAddress, message)
+  }, [message])
+  const safeMessageHash = useMemo(() => {
+    return safeMessage ? hashTypedData(safeMessage) : undefined
+  }, [safeMessage])
 
   const onMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageHash('')
     setMessage(event.target.value)
   }
 
@@ -90,83 +33,12 @@ const App = (): ReactElement => {
 
     try {
       const { accounts } = await connector.connect()
-
       account = accounts[0]
     } catch {
-      setSafeAddress('')
       return
     }
 
-    let threshold: number | undefined
-
-    try {
-      const getThresholdData = safeSignerInterface.encodeFunctionData('getThreshold', [])
-
-      const thresholdResponse: number = await connector.sendCustomRequest({
-        method: 'eth_call',
-        params: [{ to: account, data: getThresholdData }],
-      })
-      threshold = BigNumber.from(thresholdResponse).toNumber()
-    } catch {}
-
     setSafeAddress(account)
-    setThreshold(threshold)
-  }
-
-  const onVerify = async () => {
-    const MAGIC_VALUE_BYTES = '0x20c13b0b'
-
-    // Create Safe message hash
-    const getMessageHashData = safeSignerInterface.encodeFunctionData('getMessageHashForSafe', [
-      safeAddress,
-      messageHash,
-    ])
-
-    try {
-      const safeMessageHashResponse: string = await connector.sendCustomRequest({
-        method: 'eth_call',
-        params: [{ to: safeAddress, data: getMessageHashData }],
-      })
-      console.log('Safe Message hash from contract', safeMessageHashResponse)
-
-      // TODO: fetch signature using safeMessageHash
-      const { confirmations, preparedSignature } = await fetch(
-        `${GOERLI_TX_SERVICE_STAGING_URL}/v1/messages/${safeMessageHashResponse}/`,
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      ).then((resp) => {
-        if (!resp.ok) {
-          return Promise.reject('Invalid response when fetching message')
-        }
-        return resp.json() as Promise<MessageResponse>
-      })
-
-      if (!threshold || confirmations.length < threshold) {
-        setVerificationResult('Threshold not met.')
-        return
-      }
-
-      console.log('Fetched signature: ', preparedSignature)
-
-      // verify signature
-      const verifySignatureData = safeSignerInterface.encodeFunctionData('isValidSignature', [
-        messageHash,
-        preparedSignature,
-      ])
-
-      const verifySignatureResponse: string = await connector.sendCustomRequest({
-        method: 'eth_call',
-        params: [{ to: safeAddress, data: verifySignatureData }],
-      })
-
-      const isValid = verifySignatureResponse.slice(0, 10).toLowerCase() === MAGIC_VALUE_BYTES
-
-      setVerificationResult(isValid ? 'Message is signed' : 'Message signature is invalid')
-    } catch (error) {
-      console.error(error)
-      setVerificationResult('Error while veriying')
-    }
   }
 
   const onDisconnect = async () => {
@@ -174,21 +46,22 @@ const App = (): ReactElement => {
       await connector.killSession()
     } finally {
       setSafeAddress('')
-      setThreshold(undefined)
     }
   }
 
   const onToggleOffChain = async () => {
-    const offChainSigning = !isOffChain
+    const offChainSigning = !isSigningOffChain
 
-    connector.sendCustomRequest({
-      id: 1337,
-      jsonrpc: '2.0',
-      method: 'safe_setSettings',
-      params: [{ offChainSigning }],
-    })
+    try {
+      await connector.sendCustomRequest({
+        method: 'safe_setSettings',
+        params: [{ offChainSigning }],
+      })
 
-    setIsOffChain(offChainSigning)
+      setIsSigningOffChain(offChainSigning)
+    } catch {
+      // Ignore
+    }
   }
 
   const onSign = async () => {
@@ -198,8 +71,12 @@ const App = (): ReactElement => {
       const hexMessage = hexlify(toUtf8Bytes(message))
 
       await connector.signMessage([safeAddress, hexMessage])
-      setMessageHash(hashMessage(message))
-    } catch {}
+
+      const hash = hashMessage(message)
+      setMessageHash(hash)
+    } catch {
+      // Ignore
+    }
   }
 
   const onSignTypedData = async () => {
@@ -209,32 +86,61 @@ const App = (): ReactElement => {
 
     try {
       await connector.signTypedData([safeAddress, JSON.stringify(typedData)])
-      setMessageHash(hashTypedData(typedData) || '')
-    } catch {}
+
+      const hash = hashTypedData(typedData)
+      setMessageHash(hash)
+    } catch {
+      // Ignore
+    }
+  }
+
+  const onVerify = async () => {
+    const safeMessageHash = await getMessageHashForSafe(connector, safeAddress, messageHash)
+    if (!safeMessageHash) {
+      console.error('Error getting SafeMessage hash from contract.')
+      return
+    }
+    console.log('SafeMessage hash:', safeMessageHash)
+
+    const safeMessage = await fetchSafeMessage(safeMessageHash)
+    if (!safeMessage) {
+      console.error('Unable to fetch SafeMessage.')
+      return
+    }
+    console.log('SafeMessage:', safeMessage)
+
+    const threshold = await getThreshold(connector, safeAddress)
+    if (!threshold || threshold > safeMessage.confirmations.length) {
+      console.error('Threshold has not been met.')
+      return
+    }
+
+    const isValid = await isValidSignature(connector, safeAddress, messageHash, safeMessage.preparedSignature)
+
+    alert(`Signature is ${isValid ? 'valid' : 'invalid'}.`)
   }
 
   return (
     <>
-      <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>{' '}
-      {safeAddress}, threshold: {threshold}
+      <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>
+      {safeAddress ? ` Safe address: ${safeAddress}` : ''}
       <br />
       <br />
       <button onClick={onToggleOffChain} disabled={!safeAddress}>
-        {isOffChain ? 'Disable' : 'Enable'} off-chain signing
+        {isSigningOffChain ? 'Disable' : 'Enable'} off-chain signing
       </button>
       <input onChange={onMessage} placeholder="Message" />
-      <button onClick={onSign} disabled={!safeAddress}>
+      <button onClick={onSign} disabled={!safeAddress || !message}>
         Sign
       </button>
-      <button onClick={onSignTypedData} disabled={!safeAddress}>
-        Sign typed
+      <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
+        Sign in example typed data
       </button>
       <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
-        Verify Signature
+        Verify signature
       </button>
       <pre>SafeMessage: {JSON.stringify(safeMessage, null, 2)}</pre>
-      <pre>messageHash: {JSON.stringify(safeMessageHash, null, 2)}</pre>
-      <pre>Is signature valid?: {verificationResult}</pre>
+      <pre>SafeMessage hash: {JSON.stringify(safeMessageHash, null, 2)}</pre>
     </>
   )
 }

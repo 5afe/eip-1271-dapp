@@ -1,55 +1,57 @@
-import { hashMessage, isAddress } from 'ethers/lib/utils';
-import { useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import { isAddress } from 'ethers/lib/utils'
+import { useMemo, useState } from 'react'
+import type { ReactElement } from 'react'
 
-import useWalletConnect from '@/hooks/useWalletConnect';
-import { generateSafeMessageTypes, hashTypedData } from '@/utils/safe-messages';
+import useWalletConnect from '@/hooks/useWalletConnect'
+import { generateSafeMessageTypes, hashTypedData } from '@/utils/safe-messages'
+import { ethers } from 'ethers'
 
 const App = (): ReactElement => {
   const [form, setForm] = useState({
     safeAddress: '',
     message: '',
-  });
+  })
 
   const onInput = (name: keyof typeof form) => {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prevForm) => ({ ...prevForm, [name]: event.target.value }));
-    };
-  };
+      setForm((prevForm) => ({ ...prevForm, [name]: event.target.value }))
+    }
+  }
 
-  const connector = useWalletConnect();
+  const connector = useWalletConnect()
 
   const assertConnected = async () => {
     if (!connector.connected) {
-      connector.createSession();
+      connector.createSession()
     }
-  };
+  }
 
-  const [isOffChain, setIsOffChain] = useState(false);
+  const [isOffChain, setIsOffChain] = useState(false)
 
   const onToggle = async () => {
-    await assertConnected();
+    await assertConnected()
 
-    const offChainSigning = !isOffChain;
+    const offChainSigning = !isOffChain
 
     connector.sendCustomRequest({
       id: 1337,
       jsonrpc: '2.0',
       method: 'safe_setSettings',
       params: [{ offChainSigning }],
-    });
+    })
 
-    setIsOffChain(offChainSigning);
-  };
+    setIsOffChain(offChainSigning)
+  }
 
   const onSign = async () => {
-    await assertConnected();
-
-    connector.signMessage([form.safeAddress, hashMessage(form.message)]);
-  };
+    await assertConnected()
+    const messageAsHex = ethers.utils.hexlify(ethers.utils.toUtf8Bytes(form.message))
+    const result = await connector.signMessage([form.safeAddress, messageAsHex])
+    console.log('Sign result', result)
+  }
 
   const onSignTypedData = async () => {
-    await assertConnected();
+    await assertConnected()
 
     const typedData = {
       types: {
@@ -87,37 +89,31 @@ const App = (): ReactElement => {
         },
         contents: form.message,
       },
-    };
+    }
 
-    connector.signTypedData([form.safeAddress, JSON.stringify(typedData)]);
-  };
+    connector.signTypedData([form.safeAddress, JSON.stringify(typedData)])
+  }
 
   const message = useMemo(() => {
     if (!isAddress(form.safeAddress)) {
-      return;
+      return
     }
 
     try {
-      return generateSafeMessageTypes(
-        connector.chainId,
-        form.safeAddress,
-        form.message
-      );
+      return generateSafeMessageTypes(connector.chainId, form.safeAddress, form.message)
     } catch {}
-  }, [connector.chainId, form.safeAddress, form.message]);
+  }, [connector.chainId, form.safeAddress, form.message])
 
   const messageHash = useMemo(() => {
     try {
-      return hashTypedData(message);
+      return hashTypedData(message)
     } catch {}
-  }, [connector.chainId, form.safeAddress, form.message]);
+  }, [connector.chainId, form.safeAddress, form.message])
 
   return (
     <>
       <input onInput={onInput('safeAddress')} placeholder="Safe address" />
-      <button onClick={onToggle}>
-        {isOffChain ? 'Disable' : 'Enable'} off-chain signing
-      </button>
+      <button onClick={onToggle}>{isOffChain ? 'Disable' : 'Enable'} off-chain signing</button>
       <br />
       <br />
 
@@ -128,7 +124,7 @@ const App = (): ReactElement => {
       <pre>SafeMessage: {JSON.stringify(message, null, 2)}</pre>
       <pre>messageHash: {JSON.stringify(messageHash, null, 2)}</pre>
     </>
-  );
-};
+  )
+}
 
-export default App;
+export default App

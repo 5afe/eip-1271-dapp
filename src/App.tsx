@@ -1,4 +1,4 @@
-import { isAddress } from 'ethers/lib/utils';
+import { hashMessage, isAddress } from 'ethers/lib/utils';
 import { useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -18,7 +18,6 @@ const App = (): ReactElement => {
   };
 
   const connector = useWalletConnect();
-  const [address] = connector.accounts;
 
   const assertConnected = async () => {
     if (!connector.connected) {
@@ -46,7 +45,7 @@ const App = (): ReactElement => {
   const onSign = async () => {
     await assertConnected();
 
-    connector.signMessage([address, form.message]);
+    connector.signMessage([form.safeAddress, hashMessage(form.message)]);
   };
 
   const onSignTypedData = async () => {
@@ -90,11 +89,11 @@ const App = (): ReactElement => {
       },
     };
 
-    connector.signTypedData([address, JSON.stringify(typedData)]);
+    connector.signTypedData([form.safeAddress, JSON.stringify(typedData)]);
   };
 
   const message = useMemo(() => {
-    if (!form.safeAddress || !isAddress(form.safeAddress)) {
+    if (!isAddress(form.safeAddress)) {
       return;
     }
 

@@ -1,36 +1,83 @@
-import { isAddress } from 'ethers/lib/utils'
-import { useMemo, useState } from 'react'
+import { hexlify, toUtf8Bytes } from 'ethers/lib/utils'
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import useWalletConnect from '@/hooks/useWalletConnect'
-import { generateSafeMessageTypes, hashTypedData } from '@/utils/safe-messages'
-import { ethers } from 'ethers'
+import { generateSafeMessageTypedData, hashTypedData } from '@/utils/safe-messages'
+
+const getExampleTypedData = (chainId: number, verifyingContract: string, contents: string) => {
+  return {
+    types: {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
+      ],
+      Person: [
+        { name: 'name', type: 'string' },
+        { name: 'account', type: 'address' },
+      ],
+      Mail: [
+        { name: 'from', type: 'Person' },
+        { name: 'to', type: 'Person' },
+        { name: 'contents', type: 'string' },
+      ],
+    },
+    primaryType: 'Mail',
+    domain: {
+      name: 'EIP-1271 Example DApp',
+      version: '1.0',
+      chainId,
+      verifyingContract,
+    },
+    message: {
+      from: {
+        name: 'Alice',
+        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      to: {
+        name: 'Bob',
+        account: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+      contents,
+    },
+  }
+}
 
 const App = (): ReactElement => {
-  const [form, setForm] = useState({
-    safeAddress: '',
-    message: '',
-  })
-
-  const onInput = (name: keyof typeof form) => {
-    return (event: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prevForm) => ({ ...prevForm, [name]: event.target.value }))
-    }
-  }
-
   const connector = useWalletConnect()
 
-  const assertConnected = async () => {
-    if (!connector.connected) {
-      connector.createSession()
+  const [account, setAccount] = useState('')
+  const [isOffChain, setIsOffChain] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const safeMessage = generateSafeMessageTypedData(connector.chainId, account, message)
+
+  const safeMessageHash = hashTypedData(safeMessage)
+
+  const onMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(event.target.value)
+  }
+
+  const onConnect = async () => {
+    try {
+      const { accounts } = await connector.connect()
+      setAccount(accounts[0])
+    } catch {
+      setAccount('')
     }
   }
 
-  const [isOffChain, setIsOffChain] = useState(false)
+  const onDisconnect = async () => {
+    try {
+      await connector.killSession()
+    } finally {
+      setAccount('')
+    }
+  }
 
-  const onToggle = async () => {
-    await assertConnected()
-
+  const onToggleOffChain = async () => {
     const offChainSigning = !isOffChain
 
     connector.sendCustomRequest({
@@ -44,85 +91,34 @@ const App = (): ReactElement => {
   }
 
   const onSign = async () => {
-    await assertConnected()
-    const messageAsHex = ethers.utils.hexlify(ethers.utils.toUtf8Bytes(form.message))
-    const result = await connector.signMessage([form.safeAddress, messageAsHex])
-    console.log('Sign result', result)
+    const hexMessage = hexlify(toUtf8Bytes(message))
+
+    connector.signMessage([account, hexMessage])
   }
 
   const onSignTypedData = async () => {
-    await assertConnected()
+    const typedData = getExampleTypedData(connector.chainId, account, message)
 
-    const typedData = {
-      types: {
-        EIP712Domain: [
-          { name: 'name', type: 'string' },
-          { name: 'version', type: 'string' },
-          { name: 'chainId', type: 'uint256' },
-          { name: 'verifyingContract', type: 'address' },
-        ],
-        Person: [
-          { name: 'name', type: 'string' },
-          { name: 'account', type: 'address' },
-        ],
-        Mail: [
-          { name: 'from', type: 'Person' },
-          { name: 'to', type: 'Person' },
-          { name: 'contents', type: 'string' },
-        ],
-      },
-      primaryType: 'Mail',
-      domain: {
-        name: 'EIP-1271 Example DApp',
-        version: '1.0',
-        chainId: connector.chainId,
-        verifyingContract: form.safeAddress,
-      },
-      message: {
-        from: {
-          name: 'Alice',
-          account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        },
-        to: {
-          name: 'Bob',
-          account: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        },
-        contents: form.message,
-      },
-    }
-
-    connector.signTypedData([form.safeAddress, JSON.stringify(typedData)])
+    connector.signTypedData([account, JSON.stringify(typedData)])
   }
-
-  const message = useMemo(() => {
-    if (!isAddress(form.safeAddress)) {
-      return
-    }
-
-    try {
-      return generateSafeMessageTypes(connector.chainId, form.safeAddress, form.message)
-    } catch {}
-  }, [connector.chainId, form.safeAddress, form.message])
-
-  const messageHash = useMemo(() => {
-    try {
-      return hashTypedData(message)
-    } catch {}
-  }, [connector.chainId, form.safeAddress, form.message])
 
   return (
     <>
-      <input onInput={onInput('safeAddress')} placeholder="Safe address" />
-      <button onClick={onToggle}>{isOffChain ? 'Disable' : 'Enable'} off-chain signing</button>
+      <button onClick={account ? onDisconnect : onConnect}>{account ? 'Disconnect' : 'Connect'}</button> {account}
       <br />
       <br />
-
-      <input onChange={onInput('message')} placeholder="Message" />
-      <button onClick={onSign}>Sign</button>
-      <button onClick={onSignTypedData}>Sign typed</button>
-
-      <pre>SafeMessage: {JSON.stringify(message, null, 2)}</pre>
-      <pre>messageHash: {JSON.stringify(messageHash, null, 2)}</pre>
+      <button onClick={onToggleOffChain} disabled={!account}>
+        {isOffChain ? 'Disable' : 'Enable'} off-chain signing
+      </button>
+      <input onChange={onMessage} placeholder="Message" />
+      <button onClick={onSign} disabled={!account}>
+        Sign
+      </button>
+      <button onClick={onSignTypedData} disabled={!account}>
+        Sign typed
+      </button>
+      <pre>SafeMessage: {JSON.stringify(safeMessage, null, 2)}</pre>
+      <pre>messageHash: {JSON.stringify(safeMessageHash, null, 2)}</pre>
     </>
   )
 }

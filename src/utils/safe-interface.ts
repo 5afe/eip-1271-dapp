@@ -5,7 +5,7 @@ import { Interface } from 'ethers/lib/utils'
 const getSafeInterface = () => {
   const SAFE_ABI = [
     'function getThreshold() public view returns (uint256)',
-    'function getMessageHashForSafe(address safe, bytes memory message) public view returns (bytes32)',
+    'function getMessageHash(bytes memory message) public view returns (bytes32)',
     'function isValidSignature(bytes calldata _data, bytes calldata _signature) public view returns (bytes4)',
   ]
 
@@ -31,18 +31,15 @@ export const getThreshold = async (connector: WalletConnect, safeAddress: string
   return threshold
 }
 
-export const getMessageHashForSafe = async (connector: WalletConnect, safeAddress: string, messageHash: string) => {
+export const getMessageHash = async (connector: WalletConnect, safeAddress: string, messageHash: string) => {
   let safeMessageHash: string | undefined
 
   try {
-    const getMessageHashForSafeData = getSafeInterface().encodeFunctionData('getMessageHashForSafe', [
-      safeAddress,
-      messageHash,
-    ])
+    const getMessageHash = getSafeInterface().encodeFunctionData('getMessageHash', [messageHash])
 
     safeMessageHash = (await connector.sendCustomRequest({
       method: 'eth_call',
-      params: [{ to: safeAddress, data: getMessageHashForSafeData }],
+      params: [{ to: safeAddress, data: getMessageHash }],
     })) as string
   } catch {
     // Ignore

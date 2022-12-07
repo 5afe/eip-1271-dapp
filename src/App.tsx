@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 
 import useWalletConnect from '@/hooks/useWalletConnect'
 import { fetchSafeMessage, generateSafeMessage } from '@/utils/safe-messages'
-import { getMessageHashForSafe, getThreshold, isValidSignature } from '@/utils/safe-interface'
+import { getMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 
 const App = (): ReactElement => {
@@ -95,7 +95,7 @@ const App = (): ReactElement => {
   }
 
   const onVerify = async () => {
-    const safeMessageHash = await getMessageHashForSafe(connector, safeAddress, messageHash)
+    const safeMessageHash = await getMessageHash(connector, safeAddress, messageHash)
     if (!safeMessageHash) {
       console.error('Error getting SafeMessage hash from contract.')
       return

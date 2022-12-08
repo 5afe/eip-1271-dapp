@@ -4,11 +4,15 @@ import { GOERLI_TX_SERVICE_STAGING_URL } from '@/config/constants'
 import { hashTypedData } from '@/utils/web3'
 import type { EIP712TypedData } from '@/utils/web3'
 
+export const generateSafeMessageMessage = (message: string | EIP712TypedData): string => {
+  return typeof message === 'string' ? hashMessage(message) : hashTypedData(message)
+}
+
 /**
  * Generates `SafeMessage` typed data for signing
  * https://github.com/safe-global/safe-contracts/blob/main/contracts/handler/CompatibilityFallbackHandler.sol#L12
  */
-export const generateSafeMessage = (
+export const generateSafeMessageTypedData = (
   chainId: number,
   safeAddress: string,
   message: string | EIP712TypedData,
@@ -26,7 +30,7 @@ export const generateSafeMessage = (
       SafeMessage: [{ name: 'message', type: 'bytes' }],
     },
     message: {
-      message: typeof message === 'string' ? hashMessage(message) : hashTypedData(message),
+      message: generateSafeMessageMessage(message),
     },
   }
 }

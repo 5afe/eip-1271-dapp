@@ -1,9 +1,9 @@
 import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import useWalletConnect from '@/hooks/useWalletConnect'
-import { fetchSafeMessage, generateSafeMessage } from '@/utils/safe-messages'
+import { fetchSafeMessage, generateSafeMessageMessage, generateSafeMessageTypedData } from '@/utils/safe-messages'
 import { getMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 
@@ -16,12 +16,30 @@ const App = (): ReactElement => {
   const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
 
-  const safeMessage = useMemo(() => {
-    return generateSafeMessage(connector.chainId, safeAddress, message)
-  }, [message])
-  const safeMessageHash = useMemo(() => {
-    return safeMessage ? hashTypedData(safeMessage) : undefined
-  }, [safeMessage])
+  const eip191 = useMemo(() => {
+    if (!connector.chainId || !safeAddress || !message) {
+      return null
+    }
+
+    return {
+      safeMessage: generateSafeMessageMessage(message),
+      safeMessageHash: hashTypedData(generateSafeMessageTypedData(connector.chainId, safeAddress, message)),
+    }
+  }, [connector.chainId, safeAddress, message])
+
+  const eip712 = useMemo(() => {
+    if (!connector.chainId || !safeAddress || !message) {
+      return null
+    }
+
+    const exampleTypedData = getExampleTypedData(connector.chainId, safeAddress, message)
+
+    return {
+      example: exampleTypedData,
+      safeMessage: generateSafeMessageMessage(exampleTypedData),
+      safeMessageHash: hashTypedData(generateSafeMessageTypedData(connector.chainId, safeAddress, exampleTypedData)),
+    }
+  }, [connector.chainId, safeAddress, message])
 
   const onMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessageHash('')
@@ -139,8 +157,20 @@ const App = (): ReactElement => {
       <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
         Verify signature
       </button>
-      <pre>SafeMessage: {JSON.stringify(safeMessage, null, 2)}</pre>
-      <pre>SafeMessage hash: {JSON.stringify(safeMessageHash, null, 2)}</pre>
+
+      <p>EIP-191</p>
+      <pre>SafeMessage: {eip191 && eip191.safeMessage}</pre>
+      <pre>SafeMessage hash: {eip191 && eip191.safeMessageHash}</pre>
+
+      <p>EIP-1271</p>
+      <pre>SafeMessage: {eip712 && eip712.safeMessage}</pre>
+      <pre>SafeMessage hash: {eip712 && eip712.safeMessageHash}</pre>
+      {eip712 && (
+        <details>
+          <summary>Example typed data</summary>
+          <pre>{JSON.stringify(eip712.example, null, 2)}</pre>
+        </details>
+      )}
     </>
   )
 }

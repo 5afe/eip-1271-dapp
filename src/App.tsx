@@ -162,7 +162,7 @@ const App = (): ReactElement => {
       <pre>SafeMessage: {eip191 && eip191.safeMessage}</pre>
       <pre>SafeMessage hash: {eip191 && eip191.safeMessageHash}</pre>
 
-      <p>EIP-1271</p>
+      <p>EIP-712</p>
       <pre>SafeMessage: {eip712 && eip712.safeMessage}</pre>
       <pre>SafeMessage hash: {eip712 && eip712.safeMessageHash}</pre>
       {eip712 && (

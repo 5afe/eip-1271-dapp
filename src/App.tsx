@@ -1,59 +1,31 @@
 import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import useWalletConnect from '@/hooks/useWalletConnect'
-import { fetchSafeMessage, generateSafeMessageMessage, generateSafeMessageTypedData } from '@/utils/safe-messages'
-import { getMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
+import { useWalletConnect } from '@/hooks/useWalletConnect'
+import { fetchSafeMessage } from '@/utils/safe-messages'
+import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
+import { EIP191 } from '@/components/EIP191'
+import { EIP712 } from '@/components/EIP712'
 
-const App = (): ReactElement => {
+export const App = (): ReactElement => {
   const connector = useWalletConnect()
-  const [isSigningOffChain, setIsSigningOffChain] = useState(false)
+  const [safeAddress, setSafeAddress] = useState(connector.accounts[0])
 
-  const [safeAddress, setSafeAddress] = useState<string>(connector.accounts[0])
+  const [isSigningOffChain, setIsSigningOffChain] = useState(false)
 
   const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
 
-  const eip191 = useMemo(() => {
-    if (!connector.chainId || !safeAddress || !message) {
-      return null
-    }
-
-    return {
-      safeMessage: generateSafeMessageMessage(message),
-      safeMessageHash: hashTypedData(generateSafeMessageTypedData(connector.chainId, safeAddress, message)),
-    }
-  }, [connector.chainId, safeAddress, message])
-
-  const eip712 = useMemo(() => {
-    if (!connector.chainId || !safeAddress || !message) {
-      return null
-    }
-
-    const exampleTypedData = getExampleTypedData(connector.chainId, safeAddress, message)
-
-    return {
-      example: exampleTypedData,
-      safeMessage: generateSafeMessageMessage(exampleTypedData),
-      safeMessageHash: hashTypedData(generateSafeMessageTypedData(connector.chainId, safeAddress, exampleTypedData)),
-    }
-  }, [connector.chainId, safeAddress, message])
-
-  const onMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setMessageHash('')
-    setMessage(event.target.value)
-  }
-
   const onConnect = async () => {
-    let account: string | undefined
+    let account = ''
 
     try {
       const { accounts } = await connector.connect()
       account = accounts[0]
-    } catch {
-      return
+    } catch (e) {
+      console.error(e)
     }
 
     setSafeAddress(account)
@@ -64,6 +36,9 @@ const App = (): ReactElement => {
       await connector.killSession()
     } finally {
       setSafeAddress('')
+      setIsSigningOffChain(false)
+      setMessage('')
+      setMessageHash('')
     }
   }
 
@@ -75,61 +50,74 @@ const App = (): ReactElement => {
         method: 'safe_setSettings',
         params: [{ offChainSigning }],
       })
-
-      setIsSigningOffChain(offChainSigning)
-    } catch {
-      // Ignore
+    } catch (e) {
+      console.error(e)
     }
+
+    setIsSigningOffChain(offChainSigning)
+  }
+
+  const onChangeMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(event.target.value)
+  }
+
+  const onChangeMessageHash = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageHash(event.target.value)
   }
 
   const onSign = async () => {
-    setMessageHash('')
+    let messageHash = ''
 
     try {
       const hexMessage = hexlify(toUtf8Bytes(message))
 
       await connector.signMessage([safeAddress, hexMessage])
 
-      const hash = hashMessage(message)
-      setMessageHash(hash)
-    } catch {
-      // Ignore
+      messageHash = hashMessage(message)
+    } catch (e) {
+      console.error(e)
     }
+
+    setMessageHash(messageHash)
   }
 
   const onSignTypedData = async () => {
-    setMessageHash('')
+    let messageHash = ''
 
     const typedData = getExampleTypedData(connector.chainId, safeAddress, message)
 
     try {
       await connector.signTypedData([safeAddress, JSON.stringify(typedData)])
 
-      const hash = hashTypedData(typedData)
-      setMessageHash(hash)
-    } catch {
-      // Ignore
+      messageHash = hashTypedData(typedData)
+    } catch (e) {
+      console.error(e)
     }
+
+    setMessageHash(messageHash)
   }
 
   const onVerify = async () => {
-    const safeMessageHash = await getMessageHash(connector, safeAddress, messageHash)
+    const safeMessageHash = await getSafeMessageHash(connector, safeAddress, messageHash)
+
     if (!safeMessageHash) {
-      console.error('Error getting SafeMessage hash from contract.')
+      alert('Error getting SafeMessage hash from contract.')
       return
     }
     console.log('SafeMessage hash:', safeMessageHash)
 
     const safeMessage = await fetchSafeMessage(safeMessageHash)
+
     if (!safeMessage) {
-      console.error('Unable to fetch SafeMessage.')
+      alert('Unable to fetch SafeMessage.')
       return
     }
     console.log('SafeMessage:', safeMessage)
 
     const threshold = await getThreshold(connector, safeAddress)
+
     if (!threshold || threshold > safeMessage.confirmations.length) {
-      console.error('Threshold has not been met.')
+      alert('Threshold has not been met.')
       return
     }
 
@@ -141,38 +129,33 @@ const App = (): ReactElement => {
   return (
     <>
       <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>
-      {safeAddress ? ` Safe address: ${safeAddress}` : ''}
-      <br />
-      <br />
-      <button onClick={onToggleOffChain} disabled={!safeAddress}>
-        {isSigningOffChain ? 'Disable' : 'Enable'} off-chain signing
-      </button>
-      <input onChange={onMessage} placeholder="Message" />
-      <button onClick={onSign} disabled={!safeAddress || !message}>
-        Sign
-      </button>
-      <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
-        Sign in example typed data
-      </button>
-      <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
-        Verify signature
-      </button>
 
-      <p>EIP-191</p>
-      <pre>SafeMessage: {eip191 && eip191.safeMessage}</pre>
-      <pre>SafeMessage hash: {eip191 && eip191.safeMessageHash}</pre>
-
-      <p>EIP-712</p>
-      <pre>SafeMessage: {eip712 && eip712.safeMessage}</pre>
-      <pre>SafeMessage hash: {eip712 && eip712.safeMessageHash}</pre>
-      {eip712 && (
-        <details>
-          <summary>Example typed data</summary>
-          <pre>{JSON.stringify(eip712.example, null, 2)}</pre>
-        </details>
+      {safeAddress && (
+        <>
+          <button onClick={onToggleOffChain} disabled={!safeAddress}>
+            {isSigningOffChain ? 'Disable' : 'Enable'} off-chain signing
+          </button>
+          <br />
+          Safe address: {safeAddress}
+          <br />
+          <label htmlFor="messageHash">Message:</label>
+          <input name="message" onChange={onChangeMessage} value={message} />
+          <button onClick={onSign} disabled={!safeAddress || !message}>
+            Sign
+          </button>
+          <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
+            Sign in example typed data
+          </button>
+          <br />
+          <label htmlFor="messageHash">Message hash:</label>
+          <input name="messageHash" onChange={onChangeMessageHash} value={messageHash} />
+          <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
+            Verify signature
+          </button>
+          <EIP191 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
+          <EIP712 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
+        </>
       )}
     </>
   )
 }
-
-export default App

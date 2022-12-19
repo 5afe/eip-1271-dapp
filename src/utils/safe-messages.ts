@@ -4,6 +4,9 @@ import { GOERLI_TX_SERVICE_STAGING_URL } from '@/config/constants'
 import { hashTypedData } from '@/utils/web3'
 import type { EIP712TypedData } from '@/utils/web3'
 
+/**
+ * The `SafeMessage` `message` field is a hash of the message to be signed
+ */
 export const generateSafeMessageMessage = (message: string | EIP712TypedData): string => {
   return typeof message === 'string' ? hashMessage(message) : hashTypedData(message)
 }
@@ -42,12 +45,12 @@ enum SignatureType {
   ETH_SIGN = 'ETH_SIGN',
 }
 
-export type TransactionServiceSafeMessage = {
+type TransactionServiceSafeMessage = {
   created: string
   modified: string
   messageHash: string
   message: string | EIP712TypedData
-  proposedBy: string
+  proposedBy: string // Address of the owner that proposed the message
   safeAppId: number | null
   confirmations: {
     created: string
@@ -56,7 +59,7 @@ export type TransactionServiceSafeMessage = {
     signature: string
     signatureType: SignatureType
   }[]
-  preparedSignature: string
+  preparedSignature: string // Will be continuously updated by service, but only valid until threshold met
 }
 
 export const fetchSafeMessage = async (safeMessageHash: string): Promise<TransactionServiceSafeMessage | undefined> => {
@@ -71,8 +74,8 @@ export const fetchSafeMessage = async (safeMessageHash: string): Promise<Transac
       }
       return res.json() as Promise<TransactionServiceSafeMessage>
     })
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.error(e)
   }
 
   return safeMessage

@@ -16,6 +16,7 @@ export const getThreshold = async (connector: WalletConnect, safeAddress: string
   let threshold: number | undefined
 
   try {
+    // https://github.com/safe-global/safe-contracts/blob/main/contracts/base/OwnerManager.sol#L126
     const getThresholdData = getSafeInterface().encodeFunctionData('getThreshold', [])
 
     const res = (await connector.sendCustomRequest({
@@ -24,25 +25,26 @@ export const getThreshold = async (connector: WalletConnect, safeAddress: string
     })) as BigNumber
 
     threshold = BigNumber.from(res).toNumber()
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.error(e)
   }
 
   return threshold
 }
 
-export const getMessageHash = async (connector: WalletConnect, safeAddress: string, messageHash: string) => {
+export const getSafeMessageHash = async (connector: WalletConnect, safeAddress: string, messageHash: string) => {
   let safeMessageHash: string | undefined
 
   try {
+    // https://github.com/safe-global/safe-contracts/blob/main/contracts/handler/CompatibilityFallbackHandler.sol#L43
     const getMessageHash = getSafeInterface().encodeFunctionData('getMessageHash', [messageHash])
 
     safeMessageHash = (await connector.sendCustomRequest({
       method: 'eth_call',
       params: [{ to: safeAddress, data: getMessageHash }],
     })) as string
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.error(e)
   }
 
   return safeMessageHash
@@ -59,14 +61,15 @@ export const isValidSignature = async (
   let isValidSignature: string | undefined
 
   try {
+    // https://github.com/safe-global/safe-contracts/blob/main/contracts/handler/CompatibilityFallbackHandler.sol#L28
     const isValidSignatureData = getSafeInterface().encodeFunctionData('isValidSignature', [messageHash, signature])
 
     isValidSignature = (await connector.sendCustomRequest({
       method: 'eth_call',
       params: [{ to: safeAddress, data: isValidSignatureData }],
     })) as string
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.error(e)
   }
 
   return isValidSignature?.slice(0, 10).toLowerCase() === MAGIC_VALUE_BYTES

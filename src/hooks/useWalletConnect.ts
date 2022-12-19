@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 
 import { WC_BRIDGE } from '@/config/constants'
 
-const useWalletConnect = (): InstanceType<typeof WalletConnect> => {
+export const useWalletConnect = (): InstanceType<typeof WalletConnect> => {
   return useMemo(() => {
     return new WalletConnect({
       bridge: WC_BRIDGE,
@@ -12,5 +12,3 @@ const useWalletConnect = (): InstanceType<typeof WalletConnect> => {
     })
   }, [])
 }
-
-export default useWalletConnect

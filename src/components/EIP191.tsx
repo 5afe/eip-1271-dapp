@@ -32,7 +32,7 @@ export const EIP191 = ({
 
   return (
     <>
-      <p>EIP-191</p>
+      <span>EIP-191</span>
       <pre>SafeMessage: {safeMessage}</pre>
       <pre>SafeMessage hash: {safeMessageHash}</pre>
     </>

@@ -127,35 +127,45 @@ export const App = (): ReactElement => {
   }
 
   return (
-    <>
-      <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>
+    <main style={{ display: 'grid', padding: '1em', gap: '1em', gridTemplateColumns: '1fr 1fr' }}>
+      <div>
+        <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>
 
-      {safeAddress && (
-        <>
-          <button onClick={onToggleOffChain} disabled={!safeAddress}>
-            {isSigningOffChain ? 'Disable' : 'Enable'} off-chain signing
-          </button>
-          <br />
-          Safe address: {safeAddress}
-          <br />
-          <label htmlFor="messageHash">Message:</label>
-          <input name="message" onChange={onChangeMessage} value={message} />
-          <button onClick={onSign} disabled={!safeAddress || !message}>
-            Sign
-          </button>
-          <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
-            Sign in example typed data
-          </button>
-          <br />
-          <label htmlFor="messageHash">Message hash:</label>
-          <input name="messageHash" onChange={onChangeMessageHash} value={messageHash} />
-          <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
-            Verify signature
-          </button>
+        {safeAddress && (
+          <>
+            <button onClick={onToggleOffChain} disabled={!safeAddress}>
+              {isSigningOffChain ? 'Disable' : 'Enable'} off-chain signing
+            </button>
+
+            <span>Safe address: {safeAddress}</span>
+
+            <div>
+              <label htmlFor="message">Message</label>
+              <input name="message" value={message} onChange={onChangeMessage} style={{ width: '100%' }} />
+              <button onClick={onSign} disabled={!safeAddress || !message}>
+                Sign
+              </button>
+              <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
+                Sign in example typed data
+              </button>
+            </div>
+
+            <div>
+              <label htmlFor="hash">Message hash</label>
+              <input name="hash" value={messageHash} onChange={onChangeMessageHash} style={{ width: '100%' }} />
+              <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
+                Verify signature
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      {safeAddress && message && (
+        <div>
           <EIP191 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
           <EIP712 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
-        </>
+        </div>
       )}
-    </>
+    </main>
   )
 }

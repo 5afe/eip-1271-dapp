@@ -40,11 +40,11 @@ export const EIP712 = ({
 
   return (
     <>
-      <p>EIP-712</p>
+      <span>EIP-712</span>
       <pre>SafeMessage: {safeMessage}</pre>
       <pre>SafeMessage hash: {safeMessageHash}</pre>
       {exampleTypedData && (
-        <details>
+        <details style={{ cursor: 'pointer' }}>
           <summary>Example typed data</summary>
           <pre>{JSON.stringify(exampleTypedData, null, 2)}</pre>
         </details>

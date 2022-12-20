@@ -152,7 +152,7 @@ export const App = (): ReactElement => {
             </div>
 
             <div>
-              <label htmlFor="hash">Message hash</label>
+              <label htmlFor="hash">Message hash (SafeMessage)</label>
               <input name="hash" value={messageHash} onChange={onChangeMessageHash} style={{ width: '100%' }} />
               <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
                 Verify signature

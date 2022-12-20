@@ -41,7 +41,7 @@ export const EIP712 = ({
   return (
     <>
       <span>EIP-712</span>
-      <pre>Message hash: {messageHash}</pre>
+      <pre>Message hash (SafeMessage): {messageHash}</pre>
       <pre>SafeMessage hash: {safeMessageHash}</pre>
       {exampleTypedData && (
         <details style={{ cursor: 'pointer' }}>

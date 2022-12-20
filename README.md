@@ -1,20 +1,19 @@
 # Safe off-chain signing demo
 
-Example DApp that supports on-/off-chain signing via the Safe (currently with EOAs, but Smart Contract wallet support will soon be implemented).
+Example DApp that supports on-/off-chain signing via the Safe.
 
 **Please note that all linked repositories and deployments are subject to change.**
 
-## Signing messages in a Safe
+## How to run the test DApp
 
-### Installing dependencies
+1. Clone this repository.
+2. Install dependencies by running `yarn install`.
+3. Start the local server by running `yarn start`.
+4. Connect to the custom Safe deployment via the custom WalletConnect Safe App.
 
-```
-yarn install
-```
+## Deployments
 
-### Custom deployments
-
-- [Safe UI](https://github.com/safe-global/web-core/pull/1270#issuecomment-1334078694)
+- [Safe UI](https://github.com/safe-global/web-core/pull/1162#issuecomment-1334078229)
 - [WalletConnect Safe App](https://github.com/safe-global/safe-react-apps/pull/608#issuecomment-1339464666)
 
 ### Connecting to a Safe
@@ -87,11 +86,11 @@ Note: each App "session" needs to enable off-chain signing. If the Safe is close
 
 - [Demo SDK](https://github.com/safe-global/safe-apps-sdk/pull/414)
 
-## How does it work?
+## What is a `SafeMessage` and how does `SafeMessage` signing work?
 
-The test DApp includes example code outlining the `SafeMessage`. A signed `SafeMessage` is what is used to verify the validity of an _original_ EIP-191/EIP-712 message.
+When a DApp wants to sign a message, e.g. "Hello world", `eth_sign` is called with the message as a parameter. When signing off-chain, this _original_ message is hashed and added to a `SafeMessage`. It is the `SafeMessage` that is signed by the user and proposed to the Safe services.
 
-When signing off-chain, the user does not sign the _original_ message but a `SafeMessage`. A `SafeMessage` is an EIP-712 structured message, containing the `chainId`, `verifyingContract` (current Safe address) and hash of the _original_ message. By signing this, the signature is guaranteed to be unique for the _original_ message.
+A `SafeMessage` is an EIP-712 structured message, containing the `chainId`, `verifyingContract` (current Safe address) and hash of the _original_ message. By signing this, the signature is guaranteed to be unique to the current Safe for the _original_ message.
 
 ```ts
 const safeAddress = '0x65c57CC1317a1f728E921Cbf7bC08b3894196D29'
@@ -111,3 +110,7 @@ const SafeMessage = {
   },
 }
 ```
+
+## Current limitations
+
+Off-chain signing currently only supports Externally Owned Accounts (EOAs). Smart contract wallet support is under development. The progress of which can be followed [here](https://github.com/safe-global/safe-transaction-service/issues/1220).

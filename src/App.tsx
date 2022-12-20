@@ -59,6 +59,7 @@ export const App = (): ReactElement => {
 
   const onChangeMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(event.target.value)
+    setMessageHash('')
   }
 
   const onChangeMessageHash = (event: React.ChangeEvent<HTMLInputElement>) => {

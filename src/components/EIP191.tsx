@@ -13,7 +13,7 @@ export const EIP191 = ({
   safeAddress: string
   message: string
 }): ReactElement => {
-  const safeMessage = useMemo(() => {
+  const messageHash = useMemo(() => {
     if (!message) {
       return
     }
@@ -33,7 +33,7 @@ export const EIP191 = ({
   return (
     <>
       <span>EIP-191</span>
-      <pre>SafeMessage: {safeMessage}</pre>
+      <pre>Message hash: {messageHash}</pre>
       <pre>SafeMessage hash: {safeMessageHash}</pre>
     </>
   )

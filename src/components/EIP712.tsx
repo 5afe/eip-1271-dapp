@@ -21,7 +21,7 @@ export const EIP712 = ({
     return getExampleTypedData(chainId, safeAddress, message)
   }, [chainId, safeAddress, message])
 
-  const safeMessage = useMemo(() => {
+  const messageHash = useMemo(() => {
     if (!exampleTypedData) {
       return
     }
@@ -41,7 +41,7 @@ export const EIP712 = ({
   return (
     <>
       <span>EIP-712</span>
-      <pre>SafeMessage: {safeMessage}</pre>
+      <pre>Message hash: {messageHash}</pre>
       <pre>SafeMessage hash: {safeMessageHash}</pre>
       {exampleTypedData && (
         <details style={{ cursor: 'pointer' }}>

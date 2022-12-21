@@ -1,5 +1,5 @@
 import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { useWalletConnect } from '@/hooks/useWalletConnect'
@@ -42,20 +42,7 @@ export const App = (): ReactElement => {
     }
   }
 
-  const onToggleOffChain = async () => {
-    const offChainSigning = !isSigningOffChain
-
-    try {
-      await connector.sendCustomRequest({
-        method: 'safe_setSettings',
-        params: [{ offChainSigning }],
-      })
-    } catch (e) {
-      console.error(e)
-    }
-
-    setIsSigningOffChain(offChainSigning)
-  }
+  const onToggleOffChain = () => setIsSigningOffChain((prev) => !prev)
 
   const onChangeMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(event.target.value)
@@ -66,10 +53,32 @@ export const App = (): ReactElement => {
     setMessageHash(event.target.value)
   }
 
+  const applyOffChainSigningSetting = async () => {
+    try {
+      const result = await connector.sendCustomRequest({
+        method: 'safe_setSettings',
+        params: [{ offChainSigning: isSigningOffChain }],
+      })
+
+      console.log(result)
+
+      if (result && result.offChainSigning !== isSigningOffChain) {
+        throw new Error('Enabling off-chain signing did not work.')
+      }
+    } catch (e) {
+      console.error(e)
+      return false
+    }
+    return true
+  }
+
   const onSign = async () => {
     let messageHash = ''
 
     try {
+      if (!(await applyOffChainSigningSetting())) {
+        return
+      }
       const hexMessage = hexlify(toUtf8Bytes(message))
 
       await connector.signMessage([safeAddress, hexMessage])
@@ -88,6 +97,9 @@ export const App = (): ReactElement => {
     const typedData = getExampleTypedData(connector.chainId, safeAddress, message)
 
     try {
+      if (!(await applyOffChainSigningSetting())) {
+        return
+      }
       await connector.signTypedData([safeAddress, JSON.stringify(typedData)])
 
       messageHash = hashTypedData(typedData)

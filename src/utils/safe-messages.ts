@@ -1,6 +1,6 @@
 import { hashMessage, isAddress, _TypedDataEncoder } from 'ethers/lib/utils'
 
-import { GOERLI_TX_SERVICE_STAGING_URL } from '@/config/constants'
+import { GOERLI_TX_SERVICE_STAGING_URL, TX_SERVICE_URLS } from '@/config/constants'
 import { hashTypedData } from '@/utils/web3'
 import type { EIP712TypedData } from '@/utils/web3'
 
@@ -62,11 +62,16 @@ type TransactionServiceSafeMessage = {
   preparedSignature: string // Will be continuously updated by service, but only valid until threshold met
 }
 
-export const fetchSafeMessage = async (safeMessageHash: string): Promise<TransactionServiceSafeMessage | undefined> => {
+export const fetchSafeMessage = async (
+  safeMessageHash: string,
+  chainId: number,
+): Promise<TransactionServiceSafeMessage | undefined> => {
   let safeMessage: TransactionServiceSafeMessage | undefined
 
+  const TX_SERVICE_URL = TX_SERVICE_URLS[chainId.toString()]
+
   try {
-    safeMessage = await fetch(`${GOERLI_TX_SERVICE_STAGING_URL}/v1/messages/${safeMessageHash}/`, {
+    safeMessage = await fetch(`${TX_SERVICE_URL}/v1/messages/${safeMessageHash}/`, {
       headers: { 'Content-Type': 'application/json' },
     }).then((res) => {
       if (!res.ok) {

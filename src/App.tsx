@@ -11,24 +11,30 @@ import { EIP712 } from '@/components/EIP712'
 
 export const App = (): ReactElement => {
   const connector = useWalletConnect()
-  const [safeAddress, setSafeAddress] = useState(connector.accounts[0])
 
+  const [safeAddress, setSafeAddress] = useState(connector.accounts[0])
+  const [currentChainId, setCurrentChainId] = useState(connector.chainId)
   const [isSigningOffChain, setIsSigningOffChain] = useState(false)
 
   const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
 
+  const isChainSupported = currentChainId === 1 || currentChainId === 5
+
   const onConnect = async () => {
     let account = ''
+    let newChainId = 0
 
     try {
-      const { accounts } = await connector.connect()
+      const { accounts, chainId } = await connector.connect()
       account = accounts[0]
+      newChainId = chainId
     } catch (e) {
       console.error(e)
     }
 
     setSafeAddress(account)
+    setCurrentChainId(newChainId)
   }
 
   const onDisconnect = async () => {
@@ -119,7 +125,7 @@ export const App = (): ReactElement => {
     }
     console.log('SafeMessage hash:', safeMessageHash)
 
-    const safeMessage = await fetchSafeMessage(safeMessageHash)
+    const safeMessage = await fetchSafeMessage(safeMessageHash, currentChainId)
 
     if (!safeMessage) {
       alert('Unable to fetch SafeMessage.')
@@ -166,9 +172,10 @@ export const App = (): ReactElement => {
             <div>
               <label htmlFor="hash">Message hash (SafeMessage)</label>
               <input name="hash" value={messageHash} onChange={onChangeMessageHash} style={{ width: '100%' }} />
-              <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
+              <button onClick={onVerify} disabled={!safeAddress || !messageHash || !isChainSupported}>
                 Verify signature
               </button>
+              {!isChainSupported && <span>Verify not implemented for connected network</span>}
             </div>
           </>
         )}

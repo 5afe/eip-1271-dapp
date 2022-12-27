@@ -1,6 +1,6 @@
 import { hashMessage, isAddress, _TypedDataEncoder } from 'ethers/lib/utils'
 
-import { GOERLI_TX_SERVICE_STAGING_URL, TX_SERVICE_URLS } from '@/config/constants'
+import { TX_SERVICE_URLS } from '@/config/constants'
 import { hashTypedData } from '@/utils/web3'
 import type { EIP712TypedData } from '@/utils/web3'
 

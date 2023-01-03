@@ -26,6 +26,7 @@ export const generateSafeMessageTypedData = (
 
   return {
     domain: {
+      // TODO: if 1.1.1. Safe do not use chainId here
       chainId: chainId,
       verifyingContract: safeAddress,
     },

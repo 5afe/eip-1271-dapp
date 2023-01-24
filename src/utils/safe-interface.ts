@@ -1,5 +1,6 @@
-import WalletConnect from '@walletconnect/client'
-import { BigNumber } from 'ethers/lib/ethers'
+import { SignClient } from '@walletconnect/sign-client/dist/types/client'
+import { ethers } from 'ethers'
+import { BigNumber, Contract } from 'ethers/lib/ethers'
 import { Interface } from 'ethers/lib/utils'
 
 const getSafeInterface = () => {
@@ -12,18 +13,12 @@ const getSafeInterface = () => {
   return new Interface(SAFE_ABI)
 }
 
-export const getThreshold = async (connector: WalletConnect, safeAddress: string) => {
+export const getThreshold = async (connector: ethers.providers.JsonRpcProvider, safeAddress: string) => {
   let threshold: number | undefined
 
   try {
     // https://github.com/safe-global/safe-contracts/blob/main/contracts/base/OwnerManager.sol#L126
-    const getThresholdData = getSafeInterface().encodeFunctionData('getThreshold', [])
-
-    const res = (await connector.sendCustomRequest({
-      method: 'eth_call',
-      params: [{ to: safeAddress, data: getThresholdData }],
-    })) as BigNumber
-
+    const res = await new Contract(safeAddress, getSafeInterface()).connect(connector).getThreshold()
     threshold = BigNumber.from(res).toNumber()
   } catch (e) {
     console.error(e)
@@ -32,17 +27,16 @@ export const getThreshold = async (connector: WalletConnect, safeAddress: string
   return threshold
 }
 
-export const getSafeMessageHash = async (connector: WalletConnect, safeAddress: string, messageHash: string) => {
+export const getSafeMessageHash = async (
+  connector: ethers.providers.JsonRpcProvider,
+  safeAddress: string,
+  messageHash: string,
+) => {
   let safeMessageHash: string | undefined
 
   try {
     // https://github.com/safe-global/safe-contracts/blob/main/contracts/handler/CompatibilityFallbackHandler.sol#L43
-    const getMessageHash = getSafeInterface().encodeFunctionData('getMessageHash', [messageHash])
-
-    safeMessageHash = (await connector.sendCustomRequest({
-      method: 'eth_call',
-      params: [{ to: safeAddress, data: getMessageHash }],
-    })) as string
+    safeMessageHash = await new Contract(safeAddress, getSafeInterface()).connect(connector).getMessageHash(messageHash)
   } catch (e) {
     console.error(e)
   }
@@ -51,7 +45,7 @@ export const getSafeMessageHash = async (connector: WalletConnect, safeAddress: 
 }
 
 export const isValidSignature = async (
-  connector: WalletConnect,
+  connector: ethers.providers.JsonRpcProvider,
   safeAddress: string,
   messageHash: string,
   signature: string,
@@ -62,12 +56,9 @@ export const isValidSignature = async (
 
   try {
     // https://github.com/safe-global/safe-contracts/blob/main/contracts/handler/CompatibilityFallbackHandler.sol#L28
-    const isValidSignatureData = getSafeInterface().encodeFunctionData('isValidSignature', [messageHash, signature])
-
-    isValidSignature = (await connector.sendCustomRequest({
-      method: 'eth_call',
-      params: [{ to: safeAddress, data: isValidSignatureData }],
-    })) as string
+    isValidSignature = await new Contract(safeAddress, getSafeInterface())
+      .connect(connector)
+      .isValidSignature(messageHash, signature)
   } catch (e) {
     console.error(e)
   }

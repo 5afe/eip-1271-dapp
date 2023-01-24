@@ -1,45 +1,105 @@
 import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { useWalletConnect } from '@/hooks/useWalletConnect'
-import { fetchSafeMessage } from '@/utils/safe-messages'
 import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
+import { Web3Modal } from '@web3modal/standalone'
+import { ethers } from 'ethers'
 
 export const App = (): ReactElement => {
   const connector = useWalletConnect()
+  const [topic, setTopic] = useState<string>()
+  const [chainId, setChainId] = useState(5)
+  const [rpcUrl, setRpcUrl] = useState<string>()
+  const [safeAddress, setSafeAddress] = useState<string>()
+  const [currentChainId, setCurrentChainId] = useState<number>()
+  const [isSigningOffChain, setIsSigningOffChain] = useState(true)
 
-  const [safeAddress, setSafeAddress] = useState(connector.accounts[0])
-  const [currentChainId, setCurrentChainId] = useState(connector.chainId)
-  const [isSigningOffChain, setIsSigningOffChain] = useState(false)
+  const [signature, setSignature] = useState<string>()
 
   const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
 
-  const isChainSupported = currentChainId === 1 || currentChainId === 5
+  const INFURA_CHAINS = [1, 5, 137]
+
+  const RPC_MAPPING: Record<number, string> = {
+    [100]: 'https://rpc.gnosis.gateway.fm',
+    [56]: 'https://bsc-dataseed.binance.org/',
+    [42161]: 'https://arb1.arbitrum.io/rpc',
+    [1313161554]: 'https://mainnet.aurora.dev',
+    [43114]: 'https://api.avax.network/ext/bc/C/rpc',
+  }
+
+  const rpcProvider = useMemo(() => {
+    if (!currentChainId) {
+      return
+    }
+    const isInfura = import.meta.env.INFURA_KEY !== undefined && INFURA_CHAINS.includes(currentChainId)
+
+    if (isInfura) {
+      return new ethers.providers.InfuraProvider(currentChainId, import.meta.env.INFURA_KEY)
+    }
+
+    return new ethers.providers.JsonRpcProvider(rpcUrl)
+  }, [currentChainId, rpcUrl])
+
+  const web3Modal = useMemo(
+    () =>
+      new Web3Modal({
+        projectId: import.meta.env.WC_PROJECT_ID,
+        standaloneChains: [`eip155:${chainId}`],
+      }),
+    [chainId],
+  )
 
   const onConnect = async () => {
-    let account = ''
-    let newChainId = 0
+    if (!connector) {
+      return
+    }
 
     try {
-      const { accounts, chainId } = await connector.connect()
-      account = accounts[0]
-      newChainId = chainId
+      const { uri, approval } = await connector.connect({
+        requiredNamespaces: {
+          eip155: {
+            methods: ['eth_signTypedData', 'eth_sign', 'safe_setSettings'],
+            chains: [`eip155:${chainId}`],
+            events: ['accountsChanged', 'chainChanged'],
+          },
+        },
+      })
+
+      connector.on('session_delete', onDisconnect)
+
+      if (uri) {
+        web3Modal.openModal({ uri })
+
+        const session = await approval()
+        setTopic(session.topic)
+        const connectedAccount = session.namespaces.eip155.accounts[0]
+        if (connectedAccount) {
+          const [eip155, chainId, address] = connectedAccount.split(':')
+          setCurrentChainId(Number(chainId))
+          setSafeAddress(address)
+        }
+        web3Modal.closeModal()
+      }
     } catch (e) {
       console.error(e)
     }
-
-    setSafeAddress(account)
-    setCurrentChainId(newChainId)
   }
 
   const onDisconnect = async () => {
+    if (!connector || !topic) {
+      return
+    }
     try {
-      await connector.killSession()
+      // await connector?.disconnect({
+      //   topic: topic,
+      // })
     } finally {
       setSafeAddress('')
       setIsSigningOffChain(false)
@@ -55,16 +115,36 @@ export const App = (): ReactElement => {
     setMessageHash('')
   }
 
+  const onChangeChainId = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newChainId = Number(event.target.value)
+    setChainId(newChainId)
+    const newRpcUrl = RPC_MAPPING[newChainId]
+    if (newRpcUrl) {
+      setRpcUrl(newRpcUrl)
+    }
+  }
+
+  const onChangeRpcUrl = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRpcUrl(event.target.value)
+  }
+
   const onChangeMessageHash = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessageHash(event.target.value)
   }
 
   const applyOffChainSigningSetting = async () => {
+    if (!connector || !topic) {
+      return
+    }
     try {
-      const result = await connector.sendCustomRequest({
-        method: 'safe_setSettings',
-        params: [{ offChainSigning: isSigningOffChain }],
-      })
+      const result = (await connector.request({
+        chainId: 'eip155:' + currentChainId,
+        topic: topic,
+        request: {
+          method: 'safe_setSettings',
+          params: [{ offChainSigning: isSigningOffChain }],
+        },
+      })) as { offChainSigning: boolean }
 
       console.log(result)
 
@@ -79,6 +159,9 @@ export const App = (): ReactElement => {
   }
 
   const onSign = async () => {
+    if (!connector || !topic) {
+      return
+    }
     let messageHash = ''
 
     try {
@@ -87,7 +170,16 @@ export const App = (): ReactElement => {
       }
       const hexMessage = hexlify(toUtf8Bytes(message))
 
-      await connector.signMessage([safeAddress, hexMessage])
+      const signature = await connector.request<string>({
+        chainId: 'eip155:' + currentChainId,
+        topic: topic,
+        request: {
+          method: 'eth_sign',
+          params: [safeAddress, hexMessage],
+        },
+      })
+
+      setSignature(signature)
 
       messageHash = hashMessage(message)
     } catch (e) {
@@ -98,15 +190,28 @@ export const App = (): ReactElement => {
   }
 
   const onSignTypedData = async () => {
+    if (!connector || !topic || !safeAddress || !currentChainId) {
+      return
+    }
     let messageHash = ''
 
-    const typedData = getExampleTypedData(connector.chainId, safeAddress, message)
+    const typedData = getExampleTypedData(currentChainId, safeAddress, message)
 
     try {
       if (!(await applyOffChainSigningSetting())) {
         return
       }
-      await connector.signTypedData([safeAddress, JSON.stringify(typedData)])
+
+      const signature = await connector.request<string>({
+        chainId: 'eip155:' + currentChainId,
+        topic: topic,
+        request: {
+          method: 'eth_signTypedData',
+          params: [safeAddress, JSON.stringify(typedData)],
+        },
+      })
+
+      setSignature(signature)
 
       messageHash = hashTypedData(typedData)
     } catch (e) {
@@ -117,7 +222,10 @@ export const App = (): ReactElement => {
   }
 
   const onVerify = async () => {
-    const safeMessageHash = await getSafeMessageHash(connector, safeAddress, messageHash)
+    if (!connector || !safeAddress || !topic || !currentChainId || !rpcProvider || !signature) {
+      return
+    }
+    const safeMessageHash = await getSafeMessageHash(rpcProvider, safeAddress, messageHash)
 
     if (!safeMessageHash) {
       alert('Error getting SafeMessage hash from contract.')
@@ -125,29 +233,18 @@ export const App = (): ReactElement => {
     }
     console.log('SafeMessage hash:', safeMessageHash)
 
-    const safeMessage = await fetchSafeMessage(safeMessageHash, currentChainId)
-
-    if (!safeMessage) {
-      alert('Unable to fetch SafeMessage.')
-      return
-    }
-    console.log('SafeMessage:', safeMessage)
-
-    const threshold = await getThreshold(connector, safeAddress)
-
-    if (!threshold || threshold > safeMessage.confirmations.length) {
-      alert('Threshold has not been met.')
-      return
-    }
-
-    const isValid = await isValidSignature(connector, safeAddress, messageHash, safeMessage.preparedSignature)
+    const isValid = await isValidSignature(rpcProvider, safeAddress, messageHash, signature)
 
     alert(`Signature is ${isValid ? 'valid' : 'invalid'}.`)
   }
 
   return (
     <main style={{ display: 'grid', padding: '1em', gap: '1em', gridTemplateColumns: '1fr 1fr' }}>
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <label htmlFor="chainId">Chain ID</label>
+        <input name="chainId" type="number" value={chainId} onChange={onChangeChainId} />
+        <label htmlFor="rpcUrl">RPC URL</label>
+        <input name="rpcUrl" value={rpcUrl} onChange={onChangeRpcUrl} />
         <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>
 
         {safeAddress && (
@@ -172,18 +269,23 @@ export const App = (): ReactElement => {
             <div>
               <label htmlFor="hash">Message hash (SafeMessage)</label>
               <input name="hash" value={messageHash} onChange={onChangeMessageHash} style={{ width: '100%' }} />
-              <button onClick={onVerify} disabled={!safeAddress || !messageHash || !isChainSupported}>
+
+              {signature !== undefined && (
+                <span>
+                  Signature: <code>{signature}</code>
+                </span>
+              )}
+              <button onClick={onVerify} disabled={!safeAddress || !messageHash}>
                 Verify signature
               </button>
-              {!isChainSupported && <span>Verify not implemented for connected network</span>}
             </div>
           </>
         )}
       </div>
-      {safeAddress && message && (
+      {safeAddress && message && currentChainId && (
         <div>
-          <EIP191 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
-          <EIP712 chainId={connector.chainId} safeAddress={safeAddress} message={message} />
+          <EIP191 chainId={currentChainId} safeAddress={safeAddress} message={message} />
+          <EIP712 chainId={currentChainId} safeAddress={safeAddress} message={message} />
         </div>
       )}
     </main>

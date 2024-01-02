@@ -1,10 +1,10 @@
 import { hashMessage, hexlify, toUtf8Bytes } from 'ethers/lib/utils'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { useWalletConnect } from '@/hooks/useWalletConnect'
-import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe-interface'
-import { getExampleTypedData, hashTypedData } from '@/utils/web3'
+import { getSafeMessageHash, isValidSignature } from '@/utils/safe-interface'
+import { getPermit2TypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
 import { Web3Modal } from '@web3modal/standalone'
@@ -20,14 +20,13 @@ export const App = (): ReactElement => {
   const [isSigningOffChain, setIsSigningOffChain] = useState(true)
 
   const [signature, setSignature] = useState<string>()
-
-  const [message, setMessage] = useState('')
   const [messageHash, setMessageHash] = useState('')
 
   const INFURA_CHAINS = [1, 5, 137]
 
   const RPC_MAPPING: Record<number, string> = {
     [100]: 'https://rpc.gnosis.gateway.fm',
+    [137]: 'https://polygon-rpc.com',
     [56]: 'https://bsc-dataseed.binance.org/',
     [42161]: 'https://arb1.arbitrum.io/rpc',
     [1313161554]: 'https://mainnet.aurora.dev',
@@ -103,17 +102,11 @@ export const App = (): ReactElement => {
     } finally {
       setSafeAddress('')
       setIsSigningOffChain(false)
-      setMessage('')
       setMessageHash('')
     }
   }
 
   const onToggleOffChain = () => setIsSigningOffChain((prev) => !prev)
-
-  const onChangeMessage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setMessage(event.target.value)
-    setMessageHash('')
-  }
 
   const onChangeChainId = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newChainId = Number(event.target.value)
@@ -158,44 +151,13 @@ export const App = (): ReactElement => {
     return true
   }
 
-  const onSign = async () => {
-    if (!connector || !topic) {
-      return
-    }
-    let messageHash = ''
-
-    try {
-      if (!(await applyOffChainSigningSetting())) {
-        return
-      }
-      const hexMessage = hexlify(toUtf8Bytes(message))
-
-      const signature = await connector.request<string>({
-        chainId: 'eip155:' + currentChainId,
-        topic: topic,
-        request: {
-          method: 'eth_sign',
-          params: [safeAddress, hexMessage],
-        },
-      })
-
-      setSignature(signature)
-
-      messageHash = hashMessage(message)
-    } catch (e) {
-      console.error(e)
-    }
-
-    setMessageHash(messageHash)
-  }
-
   const onSignTypedData = async () => {
     if (!connector || !topic || !safeAddress || !currentChainId) {
       return
     }
     let messageHash = ''
 
-    const typedData = getExampleTypedData(currentChainId, safeAddress, message)
+    const typedData = getPermit2TypedData(currentChainId)
 
     try {
       if (!(await applyOffChainSigningSetting())) {
@@ -256,13 +218,8 @@ export const App = (): ReactElement => {
             <span>Safe address: {safeAddress}</span>
 
             <div>
-              <label htmlFor="message">Message</label>
-              <input name="message" value={message} onChange={onChangeMessage} style={{ width: '100%' }} />
-              <button onClick={onSign} disabled={!safeAddress || !message}>
-                Sign
-              </button>
-              <button onClick={onSignTypedData} disabled={!safeAddress || !message}>
-                Sign in example typed data
+              <button onClick={onSignTypedData} disabled={!safeAddress}>
+                Sign PermitSingle payload
               </button>
             </div>
 
@@ -282,10 +239,9 @@ export const App = (): ReactElement => {
           </>
         )}
       </div>
-      {safeAddress && message && currentChainId && (
+      {safeAddress && currentChainId && (
         <div>
-          <EIP191 chainId={currentChainId} safeAddress={safeAddress} message={message} />
-          <EIP712 chainId={currentChainId} safeAddress={safeAddress} message={message} />
+          <EIP712 chainId={currentChainId} safeAddress={safeAddress} />
         </div>
       )}
     </main>

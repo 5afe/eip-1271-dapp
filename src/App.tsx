@@ -7,7 +7,7 @@ import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
-import { EIP5792 } from './components/EIP5792'
+import { EIP5792 } from '@/components/EIP-5792'
 import { Web3Modal } from '@web3modal/standalone'
 import { ethers } from 'ethers'
 

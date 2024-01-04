@@ -7,6 +7,7 @@ import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
+import { EIP5792 } from './components/EIP5792'
 import { Web3Modal } from '@web3modal/standalone'
 import { ethers } from 'ethers'
 
@@ -221,6 +222,18 @@ export const App = (): ReactElement => {
     setMessageHash(messageHash)
   }
 
+  const onBundleRequest = async (request: { method: string; params: any[] }) => {
+    if (!connector || !topic || !safeAddress || !currentChainId) {
+      return
+    }
+
+    await connector.request({
+      chainId: 'eip155:' + currentChainId,
+      topic: topic,
+      request,
+    })
+  }
+
   const onVerify = async () => {
     if (!connector || !safeAddress || !topic || !currentChainId || !rpcProvider || !signature) {
       return
@@ -286,6 +299,12 @@ export const App = (): ReactElement => {
         <div>
           <EIP191 chainId={currentChainId} safeAddress={safeAddress} message={message} />
           <EIP712 chainId={currentChainId} safeAddress={safeAddress} message={message} />
+        </div>
+      )}
+
+      {safeAddress && currentChainId && (
+        <div>
+          <EIP5792 chainId={currentChainId} safeAddress={safeAddress} onRequest={onBundleRequest} />
         </div>
       )}
     </main>

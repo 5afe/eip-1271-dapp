@@ -62,27 +62,3 @@ type TransactionServiceSafeMessage = {
   }[]
   preparedSignature: string // Will be continuously updated by service, but only valid until threshold met
 }
-
-export const fetchSafeMessage = async (
-  safeMessageHash: string,
-  chainId: number,
-): Promise<TransactionServiceSafeMessage | undefined> => {
-  let safeMessage: TransactionServiceSafeMessage | undefined
-
-  const TX_SERVICE_URL = TX_SERVICE_URLS[chainId.toString()]
-
-  try {
-    safeMessage = await fetch(`${TX_SERVICE_URL}/v1/messages/${safeMessageHash}/`, {
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => {
-      if (!res.ok) {
-        return Promise.reject('Invalid response when fetching SafeMessage')
-      }
-      return res.json() as Promise<TransactionServiceSafeMessage>
-    })
-  } catch (e) {
-    console.error(e)
-  }
-
-  return safeMessage
-}

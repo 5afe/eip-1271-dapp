@@ -7,7 +7,7 @@ import { getSafeMessageHash, getThreshold, isValidSignature } from '@/utils/safe
 import { getExampleTypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
-import { EIP5792 } from '@/components/EIP-5792'
+import { EIP5792 } from '@/components/EIP5792'
 import { Web3Modal } from '@web3modal/standalone'
 import { ethers } from 'ethers'
 
@@ -66,7 +66,15 @@ export const App = (): ReactElement => {
       const { uri, approval } = await connector.connect({
         requiredNamespaces: {
           eip155: {
-            methods: ['eth_signTypedData', 'eth_sign', 'safe_setSettings'],
+            methods: [
+              'eth_signTypedData',
+              'eth_sign',
+              'safe_setSettings',
+              'wallet_sendFunctionCallBundle',
+              'wallet_sendFunctionCallBundle',
+              'wallet_getBundleStatus',
+              'wallet_showBundleStatus',
+            ],
             chains: [`eip155:${chainId}`],
             events: ['accountsChanged', 'chainChanged'],
           },
@@ -222,12 +230,12 @@ export const App = (): ReactElement => {
     setMessageHash(messageHash)
   }
 
-  const onBundleRequest = async (request: { method: string; params: any[] }) => {
+  const onBundleRequest = async (request: { method: string; params: any[] }): Promise<string | null> => {
     if (!connector || !topic || !safeAddress || !currentChainId) {
-      return
+      return null
     }
 
-    await connector.request({
+    return await connector.request({
       chainId: 'eip155:' + currentChainId,
       topic: topic,
       request,

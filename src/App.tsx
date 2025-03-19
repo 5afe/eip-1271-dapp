@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 
 import { useWalletConnect } from '@/hooks/useWalletConnect'
 import { getSafeMessageHash, isValidSignature } from '@/utils/safe-interface'
-import { getPermit2PermitBatchTypedData, getPermit2TypedData, hashTypedData } from '@/utils/web3'
+import { getPermit2PermitBatchTypedData, getPermit2TypedData, getPermitTypedData, hashTypedData } from '@/utils/web3'
 import { EIP191 } from '@/components/EIP191'
 import { EIP712 } from '@/components/EIP712'
 import { Web3Modal } from '@web3modal/standalone'
@@ -151,14 +151,18 @@ export const App = (): ReactElement => {
     return true
   }
 
-  const onSignTypedData = async (type: 'batch' | 'single') => {
+  const onSignTypedData = async (type: 'batch' | 'single' | '2612') => {
     if (!connector || !topic || !safeAddress || !currentChainId) {
       return
     }
     let messageHash = ''
 
     const typedData =
-      type === 'single' ? getPermit2TypedData(currentChainId) : getPermit2PermitBatchTypedData(currentChainId)
+      type === 'single'
+        ? getPermit2TypedData(currentChainId)
+        : type === 'batch'
+        ? getPermit2PermitBatchTypedData(currentChainId)
+        : getPermitTypedData(currentChainId, safeAddress)
 
     try {
       if (!(await applyOffChainSigningSetting())) {
@@ -228,6 +232,10 @@ export const App = (): ReactElement => {
               <button onClick={() => onSignTypedData('batch')} disabled={!safeAddress}>
                 Sign PermitBatch payload
               </button>
+            </div>
+
+            <div>
+              <button onClick={() => onSignTypedData('2612')}>Sign Permit (ERC 2612) payload</button>
             </div>
 
             <div>

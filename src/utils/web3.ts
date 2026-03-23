@@ -37,6 +37,7 @@ export const getExampleTypedData = (chainId: number, verifyingContract: string, 
       chainId,
       verifyingContract,
     },
+    primaryType: 'Example',
     message: {
       testString,
       testAddress: verifyingContract,

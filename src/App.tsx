@@ -14,7 +14,7 @@ import { ethers } from 'ethers'
 export const App = (): ReactElement => {
   const connector = useWalletConnect()
   const [topic, setTopic] = useState<string>()
-  const [chainId, setChainId] = useState(5)
+  const [chainId, setChainId] = useState('5')
   const [rpcUrl, setRpcUrl] = useState<string>()
   const [safeAddress, setSafeAddress] = useState<string>()
   const [currentChainId, setCurrentChainId] = useState<number>()
@@ -125,9 +125,9 @@ export const App = (): ReactElement => {
   }
 
   const onChangeChainId = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newChainId = Number(event.target.value)
-    setChainId(newChainId)
-    const newRpcUrl = RPC_MAPPING[newChainId]
+    // keep the raw string so the field can be cleared (Number('') -> 0 made the 0 "stick")
+    setChainId(event.target.value)
+    const newRpcUrl = RPC_MAPPING[Number(event.target.value)]
     if (newRpcUrl) {
       setRpcUrl(newRpcUrl)
     }
@@ -263,7 +263,7 @@ export const App = (): ReactElement => {
     <main style={{ display: 'grid', padding: '1em', gap: '1em', gridTemplateColumns: '1fr 1fr' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <label htmlFor="chainId">Chain ID</label>
-        <input name="chainId" type="number" value={chainId} onChange={onChangeChainId} />
+        <input name="chainId" type="text" inputMode="numeric" value={chainId} onChange={onChangeChainId} />
         <label htmlFor="rpcUrl">RPC URL</label>
         <input name="rpcUrl" value={rpcUrl} onChange={onChangeRpcUrl} />
         <button onClick={safeAddress ? onDisconnect : onConnect}>{safeAddress ? 'Disconnect' : 'Connect'}</button>

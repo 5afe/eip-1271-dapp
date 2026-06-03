@@ -51,7 +51,7 @@ export const App = (): ReactElement => {
   const web3Modal = useMemo(
     () =>
       new Web3Modal({
-        projectId: import.meta.env.WC_PROJECT_ID,
+        projectId: import.meta.env.VITE_WC_PROJECT_ID,
         standaloneChains: [`eip155:${chainId}`],
       }),
     [chainId],
